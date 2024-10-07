@@ -1,8 +1,14 @@
 import torch
 import torch.nn as nn
-from modules.loss import get_nll_loss
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import numpy as np
+import torch
+import torch.nn as nn
+from torch.optim import Adam
+from tqdm import tqdm
+import numpy as np
+import json
+import argparse
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -11,19 +17,21 @@ class Encoder(nn.Module):
         super().__init__()
         encoder_config = config_dict['encoder']
         self.rnn = nn.GRU(
-            input_size=encoder_config.get('input_dim', 256),
-            hidden_size=encoder_config.get('hidden_dim', 256),
+            input_size=encoder_config.get('input_dim', 256), # by defalt 256 if nothing is provided
+            hidden_size=encoder_config.get('hidden_dim', 256), # hdim of the encoder
             num_layers=encoder_config.get('num_layers', 1),
             dropout=0 if encoder_config.get('num_layers', 1) == 1 else config_dict.get('drop_out', 0.2),
-            batch_first=True,
+            batch_first=True, # important TODO check later
             bidirectional=encoder_config.get('bidirectional', True)
         )
 
     def forward(self, input_seq, seq_lengths):
         sorted_lengths, sort_indices = seq_lengths.sort(dim=-1, descending=True)
         sorted_seq = input_seq.index_select(0, sort_indices)
-        packed_input = pack_padded_sequence(sorted_seq, sorted_lengths, batch_first=True)
-        packed_output, hidden_states = self.rnn(packed_input)
+        packed_input_gru = pack_padded_sequence(sorted_seq, sorted_lengths, batch_first=True) # again using batch first convention, important # TODO
+
+        packed_output, hidden_states = self.rnn(packed_input_gru)
+
         output_seq, _ = pad_packed_sequence(packed_output, batch_first=True)
         hidden_states = torch.cat(hidden_states, dim=-1)
         inverse_indices = sort_indices.argsort(dim=-1, descending=False)
@@ -35,8 +43,8 @@ class Encoder(nn.Module):
 class ScaleDotAttention(nn.Module):
     def __init__(self, config_dict, mode='Dot'):
         super().__init__()
-        decoder_dim = config_dict['decoder'].get('hidden_dim', 256)
-        encoder_dim = config_dict['encoder'].get('final_out_dim', 256)
+        decoder_dim = config_dict['decoder'].get('hidden_dim', 256)# corresponding to the query
+        encoder_dim = config_dict['encoder'].get('final_out_dim', 256) # key dim
         if mode == 'Self':
             decoder_dim = encoder_dim
         self.attn_weights = nn.Parameter(torch.randn([decoder_dim, encoder_dim], device=device))
@@ -117,11 +125,7 @@ class Decoder(nn.Module):
                 outputs.append(output.squeeze(dim=1))
 
             final_output = self.output_projection(torch.stack(outputs, dim=1))
-            if self.mode == 'eval':
-                loss = get_nll_loss(final_output, target_seq, reduction='none')
-                perplexity = loss.exp()
-                return perplexity, loss.mean()
-            return get_nll_loss(final_output, target_seq, reduction='mean')
+            return final_output
 
         elif self.mode == 'infer':
             generated_ids = []
@@ -141,3 +145,47 @@ class Decoder(nn.Module):
             return torch.stack(generated_ids, dim=1)
 
         return None
+
+
+class Seq2Seq(nn.Module):
+    def __init__(self, config_dict):
+
+        super().__init__()
+
+        conf_embedding_dim = config_dict.get('embedding_dim', 1) # by default 1, but 300 in config
+        self.emb_layer = nn.Embedding(num_embeddings = config_dict.get('vocabulary_dim', 1), embedding_dim = conf_embedding_dim, padding_idx=0)
+        # print("glove embeddings start")
+        # we need to get the glove embeddings, but rn we can use random embeddings
+        word_embeddings = np.random.rand(config_dict.get('vocabulary_dim', 1), conf_embedding_dim) # TODO important
+        # print("glove embeddings end")
+        self.emb_layer.weight.data.copy_(torch.from_numpy(word_embeddings)) # initalize the embedding layer
+        self.para_req_grad = filter(lambda x: x.requires_grad, self.parameters()) # filtering out the parameters that require grad
+        print('Word Vectors initialized')
+
+        # initializing the components
+        self.encoder = Encoder(config_dict=config_dict)
+        self.decoder = Decoder(config_dict)
+        self.decoder.word_emb_layer = self.emb_layer # already has the data from glove
+
+        # hyperparmeter to be tuned # IMPORTANT TODO adam, sgd, adamw testing, and also lr
+        self.opt = Adam(params=list(self.para_req_grad), lr=config_dict.get('lr', 1e-4))
+
+    def forward(self, sequence, seq_len, style_emb, decoder_input=None, max_seq_len=16):
+
+        # after initial embedding is encoded, we now decode that output to get the final output for the entire model (we also have the style embedding)
+        encode_mask = (sequence == 0).byte() # or bool
+        sequence = self.emb_layer(sequence)
+        encode_output, encode_hidden = self.encoder(sequence, seq_len)
+        all_output = self.decoder(encode_hidden, encode_output, encode_mask, decoder_input,style_emb,max_seq_len=max_seq_len)
+        return all_output, encode_hidden
+
+
+if __name__ == '__main__':
+
+    # using config.json for now, need to have a different one for different dataloader
+    with open("configs/config.json") as f:
+        config_dict = json.load(f)
+
+    model = Seq2Seq(config_dict)
+    model.to(device)
+    print(model)
