@@ -27,13 +27,18 @@ paraphrase-en.gz (file, refer from https://github.com/malllabiisc/SGCP - used fo
 ## Run Instructions
 ### For training the model
 ```python
-python train.py --dataset quora --model_save_path directory_to_save_model
+python train.py --dataset <quora/para> --model_save_path directory_to_save_model
 ```
 ### For evaluating the model
 ```python
-python evaluate.py --dataset para/quora --model_save_path  your_saved_model  --idx epoch_num
+python evaluate.py --dataset <quora/para> --model_save_path  your_saved_model  --idx epoch_num
 ```
 ### For metrics calculation
 ```python
-python3 metrics.py -i model_save_path/trg_gen<idx>.txt -r quora/test_trg.txt -t model_save_path/exm<idx>.txt # these files are generated during evaluation
+python3 metrics.py -i model_save_path/trg_gen<idx>.txt -r <quora/para>/test_trg.txt -t model_save_path/exm<idx>.txt # these files are generated during evaluation
+```
+
+### To infer the model, run the following command
+```python
+python3 inference.py --dataset <quora/para> --model_save_path  model_save_path  --idx <idx>
 ```
