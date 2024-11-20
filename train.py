@@ -147,7 +147,7 @@ def eval_epoch(seq2seq,stex,dataloader):
 
 if __name__ == '__main__':
     opt = parse_option()
-    print(opt.configm "being used na")
+    print(opt.config, "being used na")
     with open(opt.config) as f:
         config = json.load(f)
     
