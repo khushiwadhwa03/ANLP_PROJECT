@@ -54,10 +54,8 @@ class STdata(Dataset):
 
 
 def collate_fn(batch, max_len=15):
-    # Collate function to process the raw data in batches
     batch_size = len(batch)
 
-    # Initialize tensors
     src = torch.zeros(batch_size, max_len, dtype=torch.long)
     trg = torch.zeros(batch_size, max_len + 1, dtype=torch.long)
     trg_input = torch.zeros(batch_size, max_len + 1, dtype=torch.long)
@@ -82,21 +80,18 @@ def collate_fn(batch, max_len=15):
         # sim_out = bert_out[random.choice(sim)]
         sim_out = global_bert_output[random.choice(sim)]
 
-        # Process input
         in_len.append(min(len(input_s), max_len))
         src[i, :in_len[-1]] = torch.tensor(input_s[:in_len[-1]])
 
-        # Process output
         out_len.append(min(len(output_s), max_len))
         content_trg[i, :out_len[-1]] = torch.tensor(output_s[:out_len[-1]])
         content_len.append(out_len[-1])
 
         trg[i, :out_len[-1]] = torch.tensor(output_s[:out_len[-1]])
-        trg[i, out_len[-1]] = 3  # EOS token
+        trg[i, out_len[-1]] = 3 # eos token
         trg_input[i, 1:out_len[-1] + 1] = torch.tensor(output_s[:out_len[-1]])
-        trg_input[i, 0] = 2  # SOS token
+        trg_input[i, 0] = 2 # sos token
 
-        # Process BERT inputs/outputs
         bert_src[i, :min(len(bert_in), max_len + 2)] = torch.tensor(bert_in[:max_len + 2])
         bert_trg[i, :min(len(bert_out), max_len + 2)] = torch.tensor(bert_out[:max_len + 2])
         bert_sim[i, :min(len(sim_out), max_len + 2)] = torch.tensor(sim_out[:max_len + 2])

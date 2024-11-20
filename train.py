@@ -2,20 +2,23 @@ from torch.utils.data import DataLoader
 import torch
 import json
 from tqdm import tqdm
-from dataset import STdata, collate_fn
-from modules.Seq2Seq import Seq2Seq
-from modules.StyleExtractor import StyleExtractor
-from modules.loss import SupConLoss
 from torch.optim import Adam
+
+from dataset import STdata, collate_fn
+from style import StyleExtractor
+from model import Seq2Seq
+from loss import SupConLoss
+
 import warnings
 import numpy as np
 import pickle
 import os
 import torch.nn.functional as F
-warnings.filterwarnings("ignore")
-warnings.simplefilter(action='ignore', category=FutureWarning)
 import argparse
 from tqdm import tqdm
+
+warnings.filterwarnings("ignore")
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def parse_option():
