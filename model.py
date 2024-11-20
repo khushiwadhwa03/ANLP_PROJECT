@@ -11,9 +11,12 @@ from tqdm import tqdm
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def initialise_word_embedding(config_dict):
-    file_path = "./data2/word2idx.pkl" # by default for para
     if (config_dict.get('dataset') == 'quora'):
         file_path = "./data/word2idx.pkl"
+        print("Using quora dataset")
+    elif (config_dict.get('dataset') == 'para'):
+        file_path = "./data2/word2idx.pkl" # by default for para
+        print("Using para dataset")
 
     with open(file_path, 'rb') as f:
         vocab = pickle.load(f)

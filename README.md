@@ -1,5 +1,11 @@
+# ANLP Project
+### Team Members - Khushi Wadhwa, Mahika Jain and Akshat Sanghvi (Team No. 41)
+
 ## Link to report 
 ### https://www.notion.so/ANLP-Project-Outline-1050aad568bd803da632c45d8a3c470f
+
+## Link to the presentation
+### https://www.canva.com/design/DAGXChIlsnk/F1QSv6xX7UhwzT4-sSVINQ/edit?utm_content=DAGXChIlsnk&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton
 
 ## Link to the dataset
 ### https://drive.google.com/drive/folders/1xkCtRnbeKPg_-0qR7j8jtzV8lfEcZGJm?usp=sharing
