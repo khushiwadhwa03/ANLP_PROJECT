@@ -60,27 +60,6 @@ def get_nll_loss(fc_out, fc_label, reduction='mean', ope='log_softmax'):
             return loss
 
 
-class ScaleDotAttention(nn.Module):
-    def __init__(self, config_dict):
-        super().__init__()
-        
-        dim_q = config_dict['decoder'].get('hidden_dim', 256)
-        dim_k = config_dict['encoder'].get('final_out_dim', 256)
-        
-        self.W = nn.Parameter(torch.empty([dim_q, dim_k], device=device, requires_grad=True), requires_grad=True)
-        nn.init.normal_(self.W, mean=0., std=np.sqrt(2. / (dim_q + dim_k)))
-
-    def forward(self, q, k, v, mask, bias=None):
-        attn_weight = k.bmm(q.mm(self.W).unsqueeze(dim=2)).squeeze(dim=2)
-        if bias is not None:
-            attn_weight += bias
-
-        mask = mask[:,:attn_weight.shape[-1]].bool()
-        attn_weight.masked_fill(mask, - float('inf'))
-        attn_weight = attn_weight.softmax(dim=-1)
-        attn_out = (attn_weight.unsqueeze(dim=2) * v).sum(dim=1)
-        return attn_out, attn_weight
-
 
 class Encoder(nn.Module):
     def __init__(self, config_dict):
@@ -106,6 +85,88 @@ class Encoder(nn.Module):
         # print(output.shape, hidden.shape, "shapes for important things")
         # torch.Size([128, 15, 1024]) torch.Size([128, 1024])
         return output, hidden
+
+
+class TransformerCLSEncoder(nn.Module):
+    def __init__(self, config_dict):
+        super().__init__()
+        hidden_dim = config_dict['encoder'].get('hidden_dim', 256)
+        num_layers = config_dict['encoder'].get('num_layers', 1)
+        nhead = config_dict['encoder'].get('nhead', 4)
+        dropout = config_dict.get('drop_out', 0.2)
+        input_dim = config_dict['encoder'].get('input_dim', 256)
+        output_dim = 1024
+
+        self.positional_encoding = nn.Parameter(torch.zeros(1, 512, input_dim))
+        encoder_layer = nn.TransformerEncoderLayer(d_model=input_dim, nhead=nhead, dim_feedforward=hidden_dim, dropout=dropout)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, input_dim))
+        self.output_projection = nn.Linear(input_dim, output_dim)
+
+    def forward(self, seq_arr, seq_len):
+        batch_size, _, _ = seq_arr.size()
+        
+        cls_token = self.cls_token.expand(batch_size, -1, -1)
+        seq_arr = torch.cat([cls_token, seq_arr], dim=1)
+        
+        seq_arr = seq_arr + self.positional_encoding[:, :seq_arr.size(1), :]
+        transformer_output = self.transformer_encoder(seq_arr)
+        
+        projected_output = self.output_projection(transformer_output)
+        
+        cls_output = projected_output[:, 0, :]
+        output = projected_output[:, 1:, :]
+        
+        # print("shapes of transformer outputs", projected_output.shape, cls_output.shape)
+        # torch.Size([128, 16, 1024]) torch.Size([128, 1024])
+        return output, cls_output
+
+class TransformerAVGEncoder(nn.Module):
+    def __init__(self, config_dict):
+        super().__init__()
+        hidden_dim = config_dict['encoder'].get('hidden_dim', 256)
+        num_layers = 1
+        nhead = config_dict['encoder'].get('nhead', 4)
+        dropout = config_dict.get('drop_out', 0.2)
+        input_dim = config_dict['encoder'].get('input_dim', 256)
+        output_dim = 1024
+        
+        self.positional_encoding = nn.Parameter(torch.zeros(1, 512, input_dim))
+        encoder_layer = nn.TransformerEncoderLayer(d_model=input_dim, nhead=nhead, dim_feedforward=hidden_dim, dropout=dropout)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.output_projection = nn.Linear(input_dim, output_dim)
+
+    def forward(self, seq_arr, seq_len):
+        seq_arr = seq_arr + self.positional_encoding[:, :seq_arr.size(1), :]
+        transformer_output = self.transformer_encoder(seq_arr)
+        projected_output = self.output_projection(transformer_output)
+        # averaging the sequence output along the time dimension
+        averaged_output = projected_output.mean(dim=1)
+        
+        return projected_output, averaged_output
+
+
+class ScaleDotAttention(nn.Module):
+    def __init__(self, config_dict):
+        super().__init__()
+        
+        dim_q = config_dict['decoder'].get('hidden_dim', 256)
+        dim_k = config_dict['encoder'].get('final_out_dim', 256)
+        
+        self.W = nn.Parameter(torch.empty([dim_q, dim_k], device=device, requires_grad=True), requires_grad=True)
+        nn.init.normal_(self.W, mean=0., std=np.sqrt(2. / (dim_q + dim_k)))
+
+    def forward(self, q, k, v, mask, bias=None):
+        attn_weight = k.bmm(q.mm(self.W).unsqueeze(dim=2)).squeeze(dim=2)
+        if bias is not None:
+            attn_weight += bias
+
+        mask = mask[:,:attn_weight.shape[-1]].bool()
+        attn_weight.masked_fill(mask, - float('inf'))
+        attn_weight = attn_weight.softmax(dim=-1)
+        attn_out = (attn_weight.unsqueeze(dim=2) * v).sum(dim=1)
+        return attn_out, attn_weight
 
 
 
