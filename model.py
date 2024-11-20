@@ -154,8 +154,7 @@ class LSTMEncoder(nn.Module):
         hidden_dim = config_dict['encoder'].get('hidden_dim', 256)
         input_dim = config_dict['encoder'].get('input_dim', 256)
         bidirectional = bool(config_dict['encoder'].get('bidirectional', True))
-        self.rnn = nn.LSTM(input_size=input_dim, hidden_size=hidden_dim, num_layers=num_layers, bias=True,
-                           batch_first=True, bidirectional=bidirectional)
+        self.rnn = nn.LSTM(input_size=input_dim, hidden_size=hidden_dim, num_layers=1, bias=True, batch_first=True, bidirectional=bidirectional)
 
     def forward(self, seq_arr, seq_len):
         seq_len_sorted, index = seq_len.sort(dim=-1, descending=True)

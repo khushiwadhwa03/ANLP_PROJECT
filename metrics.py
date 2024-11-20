@@ -1,8 +1,6 @@
 import argparse
 import rouge
-
-from metrics_utils import Meteor, stanford_parsetree_extractor, \
-    compute_tree_edit_distance
+from metrics_utils import Meteor, stanford_parsetree_extractor, compute_tree_edit_distance
 from tqdm import tqdm
 import ipdb as pdb
 import subprocess

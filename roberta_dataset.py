@@ -1,10 +1,14 @@
-from torch.utils.data import Dataset
-from modules.utils import loadpkl
-import os
 import torch
+from torch.utils.data import Dataset
+import os
 from transformers import RobertaTokenizer
 import random
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+import pickle
+
+def loadpkl(path):
+    with open(path,'rb') as f:
+        obj = pickle.load(f)
+    return obj
 
 class STdata(Dataset):
     def __init__(self, name, dataroot="data", max_len=15):
