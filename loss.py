@@ -2,6 +2,32 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 
+def contrastive_loss_with_margin(x1, x2, margin=1.0):
+    """
+    Alternative implementation using traditional contrastive loss with margin
+    
+    Args:
+        x1: First set of embeddings (batch_size, embedding_dim)
+        x2: Second set of embeddings (batch_size, embedding_dim)
+        margin: Margin for negative pairs
+    """
+    batch_size = x1.size(0)
+    
+    # computing pairwise distances matrix using cdist
+    dist_matrix = torch.cdist(x1, x2, p=2)
+    print(dist_matrix.mean(), dist_matrix.min(), dist_matrix.max())
+    
+    positive_mask = torch.eye(batch_size, device=x1.device)
+    negative_mask = 1 - positive_mask
+    
+    positive_loss = (dist_matrix ** 2) * positive_mask
+    negative_loss = (torch.clamp(margin - dist_matrix, min=0) ** 2) * negative_mask
+    
+    loss = (positive_loss.sum() + negative_loss.sum()) / (batch_size * batch_size)
+    
+    return loss
+
+
 class SupConLoss(nn.Module):
     """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
     It also supports the unsupervised contrastive loss in SimCLR"""
