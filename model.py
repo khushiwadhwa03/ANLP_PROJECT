@@ -12,11 +12,11 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def initialise_word_embedding(opt):
     file_path = None
-    print("CONFIG DICT dataset", opt.get('dataset'))
-    if (opt.get('dataset') == 'quora'):
+    print("Config dict dataset:", opt.dataset)
+    if (opt.dataset == 'quora'):
         file_path = "./data/word2idx.pkl"
         print("Using quora dataset")
-    elif (opt.get('dataset') == 'para'):
+    elif (opt.dataset == 'para'):
         file_path = "./data2/word2idx.pkl" # by default for para
         print("Using para dataset")
 
