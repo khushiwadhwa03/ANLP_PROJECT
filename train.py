@@ -168,7 +168,7 @@ if __name__ == '__main__':
         test_set, batch_size=opt.batch_size, shuffle=False, collate_fn=lambda x: collate_fn(x, max_len=opt.max_len)
     )
 
-    seq2seq = Seq2Seq(config).to(device)
+    seq2seq = Seq2Seq(config, opt).to(device)
     stex = StyleExtractor(config).to(device)
 
     params = list(seq2seq.parameters()) + list(stex.parameters())

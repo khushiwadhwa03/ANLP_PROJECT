@@ -62,7 +62,7 @@ test_set = STdata("test", dataroot=opt.data_folder, max_len=15)
 test_loader = DataLoader(test_set, batch_size=1, shuffle=False, collate_fn=lambda x: collate_fn(x, max_len=opt.max_len))
 
 
-seq2seq = Seq2Seq(config).to(device)
+seq2seq = Seq2Seq(config, opt).to(device)
 stex = StyleExtractor(config).to(device)
 
 seq2seq.load_state_dict(torch.load(os.path.join(opt.model_save_path,"seq2seq"+str(opt.idx)+".pkl")))

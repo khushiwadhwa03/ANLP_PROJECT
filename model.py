@@ -10,13 +10,13 @@ from tqdm import tqdm
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def initialise_word_embedding(config_dict):
+def initialise_word_embedding(opt):
     file_path = None
-    print("CONFIG DICT dataset", config_dict.get('dataset'))
-    if (config_dict.get('dataset') == 'quora'):
+    print("CONFIG DICT dataset", opt.get('dataset'))
+    if (opt.get('dataset') == 'quora'):
         file_path = "./data/word2idx.pkl"
         print("Using quora dataset")
-    elif (config_dict.get('dataset') == 'para'):
+    elif (opt.get('dataset') == 'para'):
         file_path = "./data2/word2idx.pkl" # by default for para
         print("Using para dataset")
 
@@ -319,13 +319,13 @@ class LSTMDecoder(nn.Module):
 
 
 class Seq2Seq(nn.Module):
-    def __init__(self, config_dict):
+    def __init__(self, config_dict, opt):
         super().__init__()
         embedding_dim = config_dict.get('embedding_dim', 1)
         vocabulary_dim = config_dict.get('vocabulary_dim', 1)
         self.emb_layer = nn.Embedding(num_embeddings=vocabulary_dim, embedding_dim=embedding_dim, padding_idx=0)
         print('glove - initializing word vectors')
-        glove_weight = initialise_word_embedding(config_dict)
+        glove_weight = initialise_word_embedding(opt)
         print(glove_weight.shape, self.emb_layer.weight.data.shape)
         self.emb_layer.weight.data.copy_(torch.from_numpy(glove_weight))
 
