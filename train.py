@@ -32,11 +32,11 @@ def parse_option():
 
     if opt.dataset == 'quora':
         opt.data_folder = './data/'
-        opt.config="config_quora.json"
+        opt.config= "config_quora.json"
         print("Using config for quora")
     elif opt.dataset == 'para':
         opt.data_folder = './data2/'
-        opt.config="config_para.json"
+        opt.config= "config_para.json"
         print("Using config for para")
 
     return opt
@@ -147,6 +147,7 @@ def eval_epoch(seq2seq,stex,dataloader):
 
 if __name__ == '__main__':
     opt = parse_option()
+    print(opt.configm "being used na")
     with open(opt.config) as f:
         config = json.load(f)
     
@@ -178,8 +179,8 @@ if __name__ == '__main__':
     loss_arr=[]
     ppl_arr=[]
     for epoch in range(opt.epochs):
-        loss = single_train_epoch(seq2seq,stex,optimizer,train_loader, epoch)
-        ppl = eval_epoch(seq2seq,stex,valid_loader, epoch)
+        loss = single_train_epoch(seq2seq, stex, optimizer, train_loader, epoch)
+        ppl = eval_epoch(seq2seq, stex, valid_loader, epoch)
         loss_arr.append(loss)
         ppl_arr.append(ppl)
         if (epoch+1)%opt.save_freq==0:
