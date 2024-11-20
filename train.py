@@ -150,7 +150,9 @@ if __name__ == '__main__':
     print(opt.config, "being used na")
     with open(opt.config) as f:
         config = json.load(f)
-    
+    print("here")
+    print(config)
+    print("here2")
     train_set = STdata("train", dataroot=opt.data_folder, max_len=opt.max_len)
     train_loader = DataLoader(
         train_set, batch_size=opt.batch_size, shuffle=True, collate_fn=lambda x: collate_fn(x, max_len=opt.max_len)
