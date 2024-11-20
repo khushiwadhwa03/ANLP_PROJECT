@@ -2,178 +2,236 @@ import os
 import nltk
 import pickle
 import random
-from transformers import BertTokenizer
-from nltk import word_tokenize
+from transformers import BertTokenizer, GPT2Tokenizer
 import editdistance
+from transformers import RobertaTokenizer
+
 
 def loadpkl(path):
     with open(path,'rb') as f:
         obj = pickle.load(f)
     return obj
 
-class QuoraQuestionPreprocessor:
-    def __init__(self, data_path="/path/quora"):
-        self.data_path = data_path
-        self.word_to_index = {}  # Store word-to-index mapping
-        self.index_to_word = {}  # Store index-to-word mapping
+def id_to_robertaid(sub_file="/test"):
+    idx2word = loadpkl("data/idx2word.pkl")
+    input_path = "data" + sub_file + "/src.pkl"
+    output_path = "data" + sub_file + "/trg.pkl"
 
-    def create_vocabulary(self, min_count=2, include_validation=True):
-        word_counts = {}
-        train_src_file = os.path.join(self.data_path, 'train_src.txt')
-        train_trg_file = os.path.join(self.data_path, 'train_trg.txt')
-        if include_validation:
-            valid_src_file = os.path.join(self.data_path, 'valid_src.txt')
-            valid_trg_file = os.path.join(self.data_path, 'valid_trg.txt')
+    input_s = loadpkl(input_path)
+    output_s = loadpkl(output_path)
 
-        # Create vocabulary from train and optionally valid data
-        for file in [train_src_file, train_trg_file]:
-            with open(file, encoding='utf-8') as f:
-                for line in f.readlines():
-                    words = nltk.word_tokenize(line)
-                    words = [word.lower() for word in words]
-                    tags = list(zip(*nltk.pos_tag(words)))[1]
-                    for word in words:
-                        if word not in word_counts:
-                            word_counts[word] = 0
-                        word_counts[word] += 1
-                    for tag in tags:
-                        if tag not in word_counts:
-                            word_counts[tag] = 0
-                        word_counts[tag] += 1
+    # Use the RobertaTokenizer with the appropriate model name
+    tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+    roberta_src_text = [' '.join([idx2word[word] for word in sent]) for sent in input_s]
+    roberta_trg_text = [' '.join([idx2word[word] for word in sent]) for sent in output_s]
+    roberta_src = [tokenizer.encode(sent, add_special_tokens=True) for sent in roberta_src_text]
+    roberta_trg = [tokenizer.encode(sent, add_special_tokens=True) for sent in roberta_trg_text]
 
-        if include_validation:
-            for file in [valid_src_file, valid_trg_file]:
-                with open(file, encoding='utf-8') as f:
-                    for line in f.readlines():
-                        words = nltk.word_tokenize(line)
-                        words = [word.lower() for word in words]
-                        tags = list(zip(*nltk.pos_tag(words)))[1]
-                        for word in words:
-                            if word not in word_counts:
-                                word_counts[word] = 0
-                            word_counts[word] += 1
-                        for tag in tags:
-                            if tag not in word_counts:
-                                word_counts[tag] = 0
-                            word_counts[tag] += 1
+    with open("data" + sub_file + "/roberta_src.pkl", 'wb') as f:
+        pickle.dump(roberta_src, f)
+    with open("data" + sub_file + "/roberta_trg.pkl", 'wb') as f:
+        pickle.dump(roberta_trg, f)
 
-        self.word_to_index = {'PAD': 0, 'UNK': 1, 'SOS': 2, 'EOS': 3}
-        index = 4
-        # Create word to index mapping
-        for word, count in word_counts.items():
-            if count >= min_count:
-                if word not in self.word_to_index:
-                    self.word_to_index[word] = index
-                    index += 1
+text_path = "/path/quora"
 
-        self.index_to_word = {v: k for k, v in self.word_to_index.items()}
+def creat_vocab(valid = True,min_count = 2,data_root="data"):
+    train_src_file_path = os.path.join(text_path, 'train_src.txt')
+    train_trg_file_path = os.path.join(text_path, 'train_trg.txt')
+    if valid:
+        valid_src_file_path = os.path.join(text_path, 'valid_src.txt')
+        valid_trg_file_path = os.path.join(text_path, 'valid_trg.txt')
 
-        # Save the vocabulary
-        with open("data/word2idx.pkl", 'wb') as f:
-            pickle.dump(self.word_to_index, f)
-        with open("data/idx2word.pkl", 'wb') as f:
-            pickle.dump(self.index_to_word, f)
 
-    def convert_to_indices(self, sub_file="/train"):
-        word_to_index = self.word_to_index
-        src_file = os.path.join("quora" + sub_file + "_src.txt")
-        trg_file = os.path.join("quora" + sub_file + "_trg.txt")
-        src_pos_indices = []
-        trg_pos_indices = []
-        src_word_indices = []
-        trg_word_indices = []
+    word2count = {}
 
-        with open(src_file, encoding='utf-8') as f:
-            for line in f.readlines():
+    with open(train_src_file_path,encoding='utf-8') as f_src, open(train_trg_file_path,encoding='utf-8') as f_trg:
+        for line in f_src.readlines()+f_trg.readlines():
+            words = nltk.word_tokenize(line)
+            words = [word.lower() for word in words]
+            tags = list(zip(*nltk.pos_tag(words)))[1]
+
+            for word in words:
+                if word not in word2count:
+                    word2count[word] = 0
+                word2count[word]+=1
+
+            for tag in tags:
+                if tag not in word2count:
+                    word2count[tag] = 0
+                word2count[tag]+=1
+
+
+    if valid:
+        with open(valid_src_file_path, encoding='utf-8') as f_src, open(valid_trg_file_path, encoding='utf-8') as f_trg:
+            for line in f_src.readlines() + f_trg.readlines():
                 words = nltk.word_tokenize(line)
                 words = [word.lower() for word in words]
-                word_indices = [word_to_index[word] if word in word_to_index else word_to_index['UNK'] for word in words]
                 tags = list(zip(*nltk.pos_tag(words)))[1]
-                tag_indices = [word_to_index[tag] if tag in word_to_index else word_to_index['UNK'] for tag in tags]
-                src_pos_indices.append(tag_indices)
-                src_word_indices.append(word_indices)
 
-        with open(trg_file, encoding='utf-8') as f:
-            for line in f.readlines():
-                words = nltk.word_tokenize(line)
-                words = [word.lower() for word in words]
-                word_indices = [word_to_index[word] if word in word_to_index else word_to_index['UNK'] for word in words]
-                tags = list(zip(*nltk.pos_tag(words)))[1]
-                tag_indices = [word_to_index[tag] if tag in word_to_index else word_to_index['UNK'] for tag in tags]
-                trg_pos_indices.append(tag_indices)
-                trg_word_indices.append(word_indices)
+                for word in words:
+                    if word not in word2count:
+                        word2count[word] = 0
+                    word2count[word] += 1
 
-        with open("data" + sub_file + "/src_pos.pkl", 'wb') as f:
-            pickle.dump(src_pos_indices, f)
-        with open("data" + sub_file + "/trg_pos.pkl", 'wb') as f:
-            pickle.dump(trg_pos_indices, f)
-        with open("data" + sub_file + "/src.pkl", 'wb') as f:
-            pickle.dump(src_word_indices, f)
-        with open("data" + sub_file + "/trg.pkl", 'wb') as f:
-            pickle.dump(trg_word_indices, f)
+                for tag in tags:
+                    if tag not in word2count:
+                        word2count[tag] = 0
+                    word2count[tag] += 1
 
-    def generate_bert_ids(self, sub_file="/test"):
-        index_to_word = self.index_to_word
-        input_file = "data" + sub_file + "/src.pkl"
-        output_file = "data" + sub_file + "/trg.pkl"
+    word2idx = {'PAD': 0, 'UNK': 1, 'SOS': 2, 'EOS': 3}
+    idx = 4
+    for word,count in word2count.items():
+        if count >= min_count:
+            if word not in word2idx:
+                word2idx[word] = idx
+                idx += 1
 
-        input_sequences = loadpkl(input_file)
-        output_sequences = loadpkl(output_file)
+  
+    idx2word = {v: k for k, v in word2idx.items()}
+    with open(os.path.join(data_root,"word2idx.pkl"),'wb') as f:
+        pickle.dump(word2idx,f)
+    with open(os.path.join(data_root,"idx2word.pkl"),'wb') as f:
+        pickle.dump(idx2word,f)
 
-        tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-        bert_src_texts = [' '.join([index_to_word[word] for word in sent]) for sent in input_sequences]
-        bert_trg_texts = [' '.join([index_to_word[word] for word in sent]) for sent in output_sequences]
-        bert_src_ids = [tokenizer.encode(sent, add_special_tokens=True) for sent in bert_src_texts]
-        bert_trg_ids = [tokenizer.encode(sent, add_special_tokens=True) for sent in bert_trg_texts]
+def token_to_idx(sub_file='/train'):
+    word2idx = loadpkl("data/word2idx.pkl")
+    src_path = text_path+sub_file+"_src.txt"
+    trg_path = text_path+sub_file+"_trg.txt"
+    src_idx1=[]
+    trg_idx1=[]
+    
+    src_idx2=[]
+    trg_idx2=[]
 
-        with open("data" + sub_file + "/bert_src.pkl", 'wb') as f:
-            pickle.dump(bert_src_ids, f)
-        with open("data" + sub_file + "/bert_trg.pkl", 'wb') as f:
-            pickle.dump(bert_trg_ids, f)
+    with open(src_path,encoding='utf-8') as f:
+        for line in f.readlines():
+            words = nltk.word_tokenize(line)
+            words = [word.lower() for word in words]
+            words_idx = [word2idx[word] if word in word2idx else word2idx['UNK'] for word in words]
+            tags = list(zip(*nltk.pos_tag(words)))[1]
+            tags_idx = [word2idx[word] if word in word2idx else word2idx['UNK'] for word in tags]
+            src_idx1.append(tags_idx)
+            src_idx2.append(words_idx)
 
-    def find_exemplars(self, sub_file="/test"):
-        pos_tags = loadpkl("data" + sub_file + "/trg_pos.pkl")
-        target_sentences = loadpkl("data" + sub_file + "/trg.pkl")
+    with open(trg_path,encoding='utf-8') as f:
+        for line in f.readlines():
+            words = nltk.word_tokenize(line)
+            words = [word.lower() for word in words]
+            words_idx = [word2idx[word] if word in word2idx else word2idx['UNK'] for word in words]
+            tags = list(zip(*nltk.pos_tag(words)))[1]
+            tags_idx = [word2idx[word] if word in word2idx else word2idx['UNK'] for word in tags]
+            trg_idx1.append(tags_idx)
+            trg_idx2.append(words_idx)
 
-        similar_sentences = []
-        for i in range(len(target_sentences)):
-            sentence_length = len(target_sentences[i])
-            similarity_scores = [100 for _ in range(len(target_sentences))] 
+    with open("data"+sub_file+"/src_pos.pkl",'wb') as f:
+        pickle.dump(src_idx1,f)
 
-            if i % 1000 == 0:
-                print(i)
+    with open("data"+sub_file+"/trg_pos.pkl",'wb') as f:
+        pickle.dump(trg_idx1,f)
 
-            for j in range(len(target_sentences)):
-                if i != j:
-                    other_sentence_length = len(target_sentences[j])
-                    if abs(sentence_length - other_sentence_length) > 2:
-                        continue
-                    if len(list(set(target_sentences[i]) & set(target_sentences[j]))) + 2 > len(list(set(target_sentences[i]))):
-                        continue
-                    current_pos_tags = pos_tags[i]
-                    other_pos_tags = pos_tags[j]
-                    edit_distance = editdistance.eval(current_pos_tags, other_pos_tags)
-                    similarity_scores[j] = edit_distance
+    with open("data"+sub_file+"/src.pkl",'wb') as f:
+        pickle.dump(src_idx2,f)
 
-            min_distance = min(similarity_scores)
-            similar_indices = [i for i, score in enumerate(similarity_scores) if score == min_distance]
+    with open("data"+sub_file+"/trg.pkl",'wb') as f:
+        pickle.dump(trg_idx2,f)
+    
 
-            similar_sentences.append(random.sample(similar_indices, min(5, len(similar_indices))))
+def id_to_bertid(sub_file="/test"):
 
-        with open("data" + sub_file + "/sim.pkl", 'wb') as f:
-            pickle.dump(similar_sentences, f)
-        print(similar_sentences)
 
-# Example usage
-processor = QuoraQuestionPreprocessor()
-processor.create_vocabulary(include_validation=True)
-processor.convert_to_indices(sub_file="/train")
-processor.convert_to_indices(sub_file="/valid")
-processor.convert_to_indices(sub_file="/test")
-processor.find_exemplars(sub_file="/train")
-processor.find_exemplars(sub_file="/valid")
-processor.find_exemplars(sub_file="/test")
-processor.generate_bert_ids(sub_file="/train")
-processor.generate_bert_ids(sub_file="/valid")
-processor.generate_bert_ids(sub_file="/test")
+    idx2word = loadpkl("data/idx2word.pkl")
+    input_path = "data"+sub_file+"/src.pkl"
+    output_path = "data"+sub_file+"/trg.pkl"
+
+    input_s = loadpkl(input_path)
+    output_s = loadpkl(output_path)
+
+
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+    bert_src_text = [' '.join([idx2word[word] for word in sent]) for sent in input_s]
+    bert_trg_text = [' '.join([idx2word[word] for word in sent]) for sent in output_s]
+    bert_src = [tokenizer.encode(sent, add_special_tokens=True) for sent in bert_src_text]
+    bert_trg = [tokenizer.encode(sent, add_special_tokens=True) for sent in bert_trg_text]
+
+    with open("data"+sub_file+"/bert_src.pkl",'wb') as f:
+        pickle.dump(bert_src,f)
+    with open("data"+sub_file+"/bert_trg.pkl",'wb') as f:
+        pickle.dump(bert_trg,f)
+        
+        
+def id_to_gptid(sub_file="/test"):
+
+
+    idx2word = loadpkl("data/idx2word.pkl")
+    input_path = "data"+sub_file+"/src.pkl"
+    output_path = "data"+sub_file+"/trg.pkl"
+
+    input_s = loadpkl(input_path)
+    output_s = loadpkl(output_path)
+
+
+    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    gpt_src_text = [' '.join([idx2word[word] for word in sent]) for sent in input_s]
+    gpt_trg_text = [' '.join([idx2word[word] for word in sent]) for sent in output_s]
+    gpt_src = [tokenizer.encode(sent, add_special_tokens=True) for sent in gpt_src_text]
+    gpt_trg = [tokenizer.encode(sent, add_special_tokens=True) for sent in gpt_trg_text]
+
+    with open("data"+sub_file+"/gpt_src.pkl",'wb') as f:
+        pickle.dump(gpt_src,f)
+    with open("data"+sub_file+"/gpt_trg.pkl",'wb') as f:
+        pickle.dump(gpt_trg,f)
+
+def find_exm(sub_file="/test"):
+
+    tags = loadpkl("data"+sub_file+"/trg_pos.pkl")
+    trgs = loadpkl("data"+sub_file+"/trg.pkl")
+
+    similar_list = []
+    for i in range(len(trgs)):
+        len_i = len(trgs[i])
+        same_number = [100 for k in range(len(trgs))] 
+
+        if i % 1000 == 0:
+            print(i)
+        for j in range(len(trgs)):
+            if i != j:
+                len_j = len(trgs[j])
+                if abs(len_i - len_j) > 2:
+                    continue
+                if len(list(set(trgs[i]) & set(trgs[j]))) + 2 > len(list(set(trgs[i]))):
+                    continue
+                syn_tags = tags[i]
+                temp_tags = tags[j]
+                posed = editdistance.eval(syn_tags, temp_tags)
+                same_number[j] = posed
+
+
+        m = min(same_number)
+        aaa = [i for i, j in enumerate(same_number) if j == m]
+
+        similar_list.append(random.sample(aaa, min(5, len(aaa))))
+
+    with open("data"+sub_file+"/sim.pkl", 'wb') as f:
+        pickle.dump(similar_list, f)
+    print(similar_list)
+
+#execute below function one by one
+
+#creat_vocab()
+token_to_idx(sub_file='/train')
+token_to_idx(sub_file='/valid')
+token_to_idx(sub_file='/test')
+find_exm("/train")
+find_exm("/valid")
+find_exm("/test")
+id_to_bertid("/train")
+id_to_bertid("/valid")
+id_to_bertid("/test")
+# TRYING TO USE DIFFERENT EMBEDDINGS
+# id_to_gptid("/train")
+# id_to_gptid("/valid")
+# id_to_gptid("/test")
+# id_to_robertaid("/train")
+# id_to_robertaid("/valid")
+# id_to_robertaid("/test")
 

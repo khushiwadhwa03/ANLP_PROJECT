@@ -3,7 +3,6 @@ import nltk
 import pickle
 import random
 from transformers import BertTokenizer
-from nltk import word_tokenize
 import editdistance
 
 def loadpkl(path):
