@@ -9,16 +9,12 @@ from style import StyleExtractor
 from model import Seq2Seq
 from loss import SupConLoss
 
-import warnings
 import numpy as np
 import pickle
 import os
 import torch.nn.functional as F
 import argparse
 from tqdm import tqdm
-
-warnings.filterwarnings("ignore")
-warnings.simplefilter(action='ignore', category=FutureWarning)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def parse_option():
@@ -36,12 +32,12 @@ def parse_option():
 
     if opt.dataset == 'quora':
         opt.data_folder = './data/'
-        opt.config="config.json"
-        print("Using config 1")
+        opt.config="config_quora.json"
+        print("Using config for quora")
     elif opt.dataset == 'para':
         opt.data_folder = './data2/'
-        opt.config="config2.json"
-        print("Using config 2")
+        opt.config="config_para.json"
+        print("Using config for para")
 
     return opt
 

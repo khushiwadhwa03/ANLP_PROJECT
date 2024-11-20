@@ -91,7 +91,7 @@ class TransformerCLSEncoder(nn.Module):
     def __init__(self, config_dict):
         super().__init__()
         hidden_dim = config_dict['encoder'].get('hidden_dim', 256)
-        num_layers = config_dict['encoder'].get('num_layers', 1)
+        num_layers = 1
         nhead = config_dict['encoder'].get('nhead', 4)
         dropout = config_dict.get('drop_out', 0.2)
         input_dim = config_dict['encoder'].get('input_dim', 256)
@@ -153,11 +153,9 @@ class LSTMEncoder(nn.Module):
         super().__init__()
         hidden_dim = config_dict['encoder'].get('hidden_dim', 256)
         input_dim = config_dict['encoder'].get('input_dim', 256)
-        num_layers = config_dict['encoder'].get('num_layers', 1)
-        drop_out = config_dict.get('drop_out', 0.2)
         bidirectional = bool(config_dict['encoder'].get('bidirectional', True))
         self.rnn = nn.LSTM(input_size=input_dim, hidden_size=hidden_dim, num_layers=num_layers, bias=True,
-                           batch_first=True, dropout=(0 if num_layers == 1 else drop_out), bidirectional=bidirectional)
+                           batch_first=True, bidirectional=bidirectional)
 
     def forward(self, seq_arr, seq_len):
         seq_len_sorted, index = seq_len.sort(dim=-1, descending=True)
@@ -206,7 +204,7 @@ class Decoder(nn.Module):
         input_dim = config_dict['decoder'].get('input_dim', 256)
         hidden_dim = config_dict['decoder'].get('hidden_dim', 256)
 
-        self.W_e2d = nn.Linear(encoder_final_out_dim + config_dict['style_attn']['style_in'], decoder_hidden_dim, bias=True) # 1024+768
+        self.W_e2d = nn.Linear(encoder_final_out_dim + config_dict['style_in'], decoder_hidden_dim, bias=True) # 1024+768
         self.word_emb_layer = None
         self.attention_layer = ScaleDotAttention(config_dict)
         self.gru = nn.GRU(input_size=input_dim, hidden_size=hidden_dim, num_layers=1, bias=True, batch_first=True, bidirectional=False)
@@ -227,6 +225,7 @@ class Decoder(nn.Module):
             decoder_output_arr = []
 
             for t in range(decoder_input.size()[-1]):
+                # we later need to define a stopping criterion stop at some maximum length # TODO important
                 context, _ = self.attention_layer(hidden[-1], encode_output, encode_output, encoder_mask)
                 output, hidden = self.gru(torch.cat([context,decoder_input_emb[:, t]], dim=-1).unsqueeze(dim=1), hidden)
                 decoder_output_arr.append(output.squeeze(dim=1))
@@ -265,7 +264,7 @@ class LSTMDecoder(nn.Module):
         vocabulary_dim = config_dict.get('vocabulary_dim', 1)
         input_dim = config_dict['decoder'].get('input_dim', 256)
         hidden_dim = config_dict['decoder'].get('hidden_dim', 256)
-        self.W_e2d = nn.Linear(encoder_final_out_dim + config_dict['style_attn']['style_in'], decoder_hidden_dim, bias=True)
+        self.W_e2d = nn.Linear(encoder_final_out_dim + config_dict['style_in'], decoder_hidden_dim, bias=True)
         self.word_emb_layer = None
         self.attention_layer = ScaleDotAttention(config_dict)
         self.lstm = nn.LSTM(input_size=input_dim, hidden_size=hidden_dim, num_layers=1, bias=True, batch_first=True, bidirectional=False)
@@ -332,6 +331,7 @@ class Seq2Seq(nn.Module):
         self.decoder = Decoder(config_dict)
         self.decoder.word_emb_layer = self.emb_layer
         self.para = list(filter(lambda x: x.requires_grad, self.parameters()))
+        # hyperparmeter to be tuned # IMPORTANT TODO adam, sgd, adamw testing, and also lr
         self.opt = Adam(params=self.para, lr=config_dict.get('lr', 1e-4))
 
     def forward(self, seq_arr, seq_len,style_emb, response=None, decoder_input=None, max_seq_len=16):
