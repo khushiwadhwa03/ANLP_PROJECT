@@ -1,6 +1,8 @@
 # ANLP Project
 ### Team Members - Khushi Wadhwa, Mahika Jain and Akshat Sanghvi (Team No. 41)
 
+### This project addresses the challenge of improving Exemplar-Guided Paraphrase Generation (EGPG). This task aims to generate paraphrases that not only retain the original meaning but also mimic the style of a given "exemplar" sentence. 
+
 ## Link to report 
 ### https://www.notion.so/ANLP-Project-Outline-1050aad568bd803da632c45d8a3c470f
 
